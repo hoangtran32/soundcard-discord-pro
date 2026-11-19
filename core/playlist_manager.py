@@ -2,6 +2,8 @@ import json
 import os
 import uuid
 import time
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import List, Dict, Any, Optional
 from core.search_engine import search_engine, format_duration
 
@@ -25,12 +27,20 @@ class PlaylistManager:
             print(f"[PlaylistManager] Error loading playlist: {e}")
             return []
 
-    def save(self):
+    def commit(self, items: List[Dict[str, Any]]):
+        target = Path(self.filepath)
+        temporary = None
         try:
-            with open(self.filepath, "w", encoding="utf-8") as f:
-                json.dump(self.items, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            print(f"[PlaylistManager] Error saving playlist: {e}")
+            with NamedTemporaryFile(mode="w", encoding="utf-8", dir=target.parent, delete=False) as file:
+                temporary = Path(file.name)
+                json.dump(items, file, indent=4, ensure_ascii=False)
+                file.flush()
+                os.fsync(file.fileno())
+            temporary.replace(target)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        self.items = items
 
     async def add_url_or_query(self, query_or_url: str, platform: str = "youtube") -> List[Dict[str, Any]]:
         """Extract metadata for URL or search query using the multi-platform engine."""
@@ -55,9 +65,7 @@ class PlaylistManager:
         for item in results:
             item["selected"] = True
             item["added_at"] = int(time.time())
-            self.items.append(item)
-
-        self.save()
+        self.commit([*self.items, *results])
         return results
 
     def add_item_direct(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -74,8 +82,7 @@ class PlaylistManager:
             "selected": True,
             "added_at": int(time.time())
         }
-        self.items.append(clean_item)
-        self.save()
+        self.commit([*self.items, clean_item])
         return clean_item
 
     def add_local_file(self, file_path: str) -> Optional[Dict[str, Any]]:
@@ -95,34 +102,28 @@ class PlaylistManager:
             "selected": True,
             "added_at": int(time.time())
         }
-        self.items.append(item)
-        self.save()
+        self.commit([*self.items, item])
         return item
 
     def delete_item(self, item_id: str) -> bool:
-        original_len = len(self.items)
-        self.items = [i for i in self.items if i.get("id") != item_id]
-        if len(self.items) != original_len:
-            self.save()
-            return True
-        return False
+        remaining = [i for i in self.items if i.get("id") != item_id]
+        if len(remaining) == len(self.items):
+            return False
+        self.commit(remaining)
+        return True
 
     def delete_multiple(self, item_ids: List[str]):
         id_set = set(item_ids)
-        self.items = [i for i in self.items if i.get("id") not in id_set]
-        self.save()
+        self.commit([i for i in self.items if i.get("id") not in id_set])
 
     def set_selected(self, item_id: str, selected: bool):
-        for item in self.items:
-            if item.get("id") == item_id:
-                item["selected"] = selected
-                break
-        self.save()
+        self.commit([
+            {**item, "selected": selected} if item.get("id") == item_id else item
+            for item in self.items
+        ])
 
     def select_all(self, selected: bool = True):
-        for item in self.items:
-            item["selected"] = selected
-        self.save()
+        self.commit([{**item, "selected": selected} for item in self.items])
 
     def reorder(self, item_ids: List[str]):
         item_map = {item["id"]: item for item in self.items}
@@ -133,8 +134,7 @@ class PlaylistManager:
         for item in self.items:
             if item["id"] not in item_ids:
                 reordered.append(item)
-        self.items = reordered
-        self.save()
+        self.commit(reordered)
 
     def get_selected(self) -> List[Dict[str, Any]]:
         return [i for i in self.items if i.get("selected", False)]
@@ -143,8 +143,7 @@ class PlaylistManager:
         return self.items
 
     def clear(self):
-        self.items = []
-        self.save()
+        self.commit([])
 
 playlist_manager = PlaylistManager(
     "data/shared-playlist.json" if "SOUNDCARD_SHARE_PASSWORD" in os.environ else "data/playlist.json"

@@ -10,7 +10,8 @@ const API = {
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ detail: res.statusText }));
-                throw new Error(err.detail || 'Request failed');
+                const detail = typeof err.detail === 'string' ? err.detail : err.detail?.[0]?.msg;
+                throw new Error(detail || 'Không thực hiện được yêu cầu.');
             }
             return await res.json();
         } catch (e) {

@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+from core.album_api import get_owned_album, require_album_origin, require_profile, router as album_router
+from core.album_library import album_library
 from core.config_manager import config_manager
 from core.playlist_manager import playlist_manager
 from core.room_manager import room_manager
@@ -33,6 +35,7 @@ from core.web_share import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    album_library.initialize()
     loop = asyncio.get_running_loop()
     streamer.set_event_loop(loop)
     broadcast_task = asyncio.create_task(_ws_broadcast_loop())
@@ -45,6 +48,7 @@ async def lifespan(app: FastAPI):
         await bot.close()
 
 app = FastAPI(title="SoundCard Discord API", lifespan=lifespan)
+app.include_router(album_router)
 
 if SHARED:
     app.middleware("http")(protect_shared_web)
@@ -87,9 +91,9 @@ room_connections = asyncio.Lock()
 def browser_config():
     config = config_manager.load()
     if not SHARED:
-        return config
+        return {**config, "albums_enabled": True}
     fields = ("current_background", "bg_blur", "bg_brightness", "glass_opacity", "volume")
-    return {**{field: config.get(field) for field in fields}, "shared": True}
+    return {**{field: config.get(field) for field in fields}, "shared": True, "albums_enabled": True}
 
 
 def browser_room(room):
@@ -103,8 +107,9 @@ def browser_rooms():
     return [browser_room(room) for room in room_manager.get_all()]
 
 
-async def play_in_selected_rooms(track):
+async def play_in_selected_rooms(track, album=None):
     if not SHARED:
+        streamer.active_album = album
         await streamer.play_track(track)
         return
     async with room_connections:
@@ -118,6 +123,7 @@ async def play_in_selected_rooms(track):
                 connected = True
         if not connected:
             raise HTTPException(status_code=503, detail="Bot chưa kết nối được vào kênh Discord đã chọn.")
+        streamer.active_album = album
         await streamer.play_track(track)
 
 @app.websocket("/ws/player")
@@ -208,7 +214,13 @@ async def player_play(payload: Dict[str, Any] = Body(default={})):
     if streamer.is_paused:
         streamer.resume()
         return {"status": "resumed"}
-        
+
+    if streamer.active_album:
+        album = streamer.active_album
+        track = album["tracks"][0]
+        await play_in_selected_rooms(track, album)
+        return {"status": "ok", "playing": track}
+
     selected = playlist_manager.get_selected()
     if selected:
         await play_in_selected_rooms(selected[0])
@@ -220,6 +232,20 @@ async def player_play(payload: Dict[str, Any] = Body(default={})):
         return {"status": "ok", "playing": all_tracks[0]}
 
     return {"status": "empty_playlist"}
+
+@app.post("/api/albums/{album_id}/play", dependencies=[Depends(require_album_origin)])
+async def play_album(album_id: str, payload: Dict[str, Any] = Body(default={}),
+                     username: str = Depends(require_profile)):
+    album = get_owned_album(username, album_id)
+    tracks = album["tracks"]
+    if not tracks:
+        raise HTTPException(409, "Hãy thêm bài hát vào album trước khi phát.")
+    track_id = payload.get("track_id")
+    track = next((item for item in tracks if item["id"] == track_id), None) if track_id else tracks[0]
+    if track is None:
+        raise HTTPException(404, "Không tìm thấy bài trong album.")
+    await play_in_selected_rooms(track, album)
+    return {"status": "ok", "playing": track}
 
 @app.post("/api/player/pause")
 async def player_pause():

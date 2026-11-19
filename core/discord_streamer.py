@@ -137,6 +137,7 @@ class DiscordAudioStreamer:
         self.bots: Dict[str, DiscordBotWorker] = {}
         self.dispatcher: Optional[StreamDispatcher] = None
         self.current_track: Optional[Dict[str, Any]] = None
+        self.active_album: Optional[Dict[str, Any]] = None
         self.is_playing: bool = False
         self.is_paused: bool = False
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -325,8 +326,11 @@ class DiscordAudioStreamer:
 
         await self.next_track()
 
+    def playback_tracks(self):
+        return self.active_album["tracks"] if self.active_album else playlist_manager.get_selected()
+
     async def next_track(self):
-        selected_items = playlist_manager.get_selected()
+        selected_items = self.playback_tracks()
         if not selected_items:
             self.stop()
             return
@@ -357,7 +361,7 @@ class DiscordAudioStreamer:
         await self.play_track(selected_items[next_idx])
 
     async def prev_track(self):
-        selected_items = playlist_manager.get_selected()
+        selected_items = self.playback_tracks()
         if not selected_items:
             self.stop()
             return
@@ -407,12 +411,25 @@ class DiscordAudioStreamer:
         pos = self.dispatcher.position_seconds if self.dispatcher else 0.0
         vu = self.dispatcher.current_vu if self.dispatcher else 0.0
         spectrum = self.dispatcher.current_spectrum if self.dispatcher else [0] * 16
+        album_preview = None
+        if self.active_album:
+            tracks = self.playback_tracks()
+            current_id = self.current_track["id"] if self.current_track else None
+            current_index = next((i for i, track in enumerate(tracks) if track["id"] == current_id), -1)
+            upcoming = tracks[current_index + 1:current_index + 6]
+            album_preview = {
+                "name": self.active_album["name"],
+                "remaining": len(tracks) - current_index - 1,
+                "upcoming": [{"title": track["title"], "duration_str": track["duration_str"],
+                              "duration": track["duration"]} for track in upcoming],
+            }
 
         return {
             "is_playing": self.is_playing,
             "is_paused": self.is_paused,
             "position": round(pos, 1),
             "current_track": self.current_track,
+            "album_queue": album_preview,
             "volume": config_manager.get("volume", 1.0),
             "repeat_mode": config_manager.get("repeat_mode", "off"),
             "shuffle": config_manager.get("shuffle", False),

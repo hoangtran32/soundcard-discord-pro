@@ -43,6 +43,11 @@
                     <span class="nav-counter" id="playlist-count-badge">0</span>
                     <div class="active-glow"></div>
                 </button>
+                <button class="nav-item" data-tab="albums" id="tab-btn-albums" hidden>
+                    <i class="fa-solid fa-record-vinyl" aria-hidden="true"></i>
+                    <span>Album cá nhân</span>
+                    <div class="active-glow"></div>
+                </button>
                 <button class="nav-item" data-tab="rooms" id="tab-btn-rooms">
                     <i class="fa-solid fa-tower-broadcast"></i>
                     <span>Kênh Thoại (Phòng)</span>
@@ -243,7 +248,7 @@
 
                         <div class="live-queue-preview">
                             <div class="preview-header">
-                                <span><i class="fa-solid fa-list-ol"></i> Hàng Đợi Tiếp Theo</span>
+                                <span><i class="fa-solid fa-list-ol"></i> <span id="queue-preview-heading">Hàng Đợi Tiếp Theo</span></span>
                                 <span class="queue-count" id="queue-preview-count">0 bài đã chọn</span>
                             </div>
                             <div class="preview-list" id="queue-preview-list">
@@ -293,6 +298,57 @@
                     <div class="playlist-scroll-area">
                         <div class="playlist-items" id="playlist-items-list">
                             <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="tab-content" id="tab-albums">
+                <div class="tab-pane-container glass-card album-pane">
+                    <div class="pane-header">
+                        <h2>Album cá nhân</h2>
+                        <button type="button" class="btn-glass-secondary" id="album-logout" hidden>Đăng xuất</button>
+                    </div>
+                    <p id="album-feedback" role="status" hidden></p>
+                    <form id="album-profile-form" class="album-profile-form">
+                        <p>Dùng hồ sơ album để mở lại các album của bạn trên bất kỳ thiết bị nào.</p>
+                        <label for="album-username">Tên đăng nhập</label>
+                        <input class="glass-input" id="album-username" name="username" minlength="3" maxlength="32" autocomplete="username" required>
+                        <label for="album-password">Mật khẩu riêng của hồ sơ</label>
+                        <input class="glass-input" id="album-password" name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required>
+                        <div class="album-actions">
+                            <button type="submit" class="btn-glass-primary" value="login">Đăng nhập</button>
+                            <button type="submit" class="btn-glass-secondary" value="register">Tạo hồ sơ</button>
+                        </div>
+                    </form>
+                    <div id="album-library" hidden>
+                        <p id="album-profile-name"></p>
+                        <form id="album-create-form" class="album-row-form">
+                            <div>
+                                <label for="album-name">Tên album mới</label>
+                                <input class="glass-input" id="album-name" name="name" maxlength="80" required>
+                            </div>
+                            <button class="btn-glass-primary" type="submit">Tạo album</button>
+                        </form>
+                        <div id="album-picker" hidden>
+                            <label for="album-select">Chọn album</label>
+                            <select class="glass-input" id="album-select"></select>
+                        </div>
+                        <div id="album-details" hidden>
+                            <div class="album-actions">
+                                <button type="button" id="album-play" class="btn-glass-accent">Phát album</button>
+                                <button type="button" id="album-copy-tracks" class="btn-glass-secondary">Lưu bài đã chọn từ danh sách chung</button>
+                                <button type="button" id="album-delete" class="btn-glass-danger">Xóa album</button>
+                            </div>
+                            <form id="album-track-form" class="album-row-form">
+                                <div>
+                                    <label for="album-track-query">Tên bài hoặc link nhạc</label>
+                                    <input class="glass-input" id="album-track-query" name="query" maxlength="300" required>
+                                </div>
+                                <button class="btn-glass-primary" type="submit">Thêm bài</button>
+                            </form>
+                            <ol id="album-tracks"></ol>
+                            <p id="album-empty" hidden>Album này chưa có bài hát.</p>
                         </div>
                     </div>
                 </div>
@@ -483,6 +539,7 @@
     <!-- Scripts -->
     <script src="../static/js/api.js"></script>
     <script src="../static/js/visualizer.js"></script>
+    <script src="../static/js/albums.js"></script>
     <script src="../static/js/app.js"></script>
 </body>
 </html>

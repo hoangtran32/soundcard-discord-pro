@@ -61,6 +61,11 @@ GitHub có thể lưu mã nguồn. GitHub Pages chỉ phục vụ file tĩnh. B�
 - Bảng hiển thị trực tiếp danh sách các phòng thoại đang nhận luồng âm thanh phát trực tuyến.
 
 ### 2. 📋 Danh Sách Nhạc & Quản Lý Link (Playlist)
+
+- Danh sách chung trên web tự lưu vào `data/shared-playlist.json` trên máy chạy bot và được tải lại khi mở file `.bat` lần sau.
+- Trong **Album cá nhân**, tạo hồ sơ riêng, tạo album rồi thêm bài theo tên hoặc link nhạc. Bạn cũng có thể tích chọn các bài ở **Danh Sách Nhạc** rồi lưu bản sao vào album.
+- Chọn **Phát album** để phát từ đầu hoặc **Phát từ bài** để bắt đầu ở một bài cụ thể. Nút phát tiếp, quay lại và tự chuyển bài dùng danh sách của album đang phát. Trình phát Discord dùng chung trong phòng.
+- Hồ sơ và album nằm trong `data/albums.sqlite3` trên máy chạy bot. Khi tunnel đổi địa chỉ, đăng nhập lại bằng cùng tên và mật khẩu riêng để mở các album đã lưu.
 - Dán link nhạc từ **YouTube, SoundCloud, URL âm thanh trực tiếp (MP3/WAV/AAC)** hoặc từ khóa tìm kiếm vào ô trên cùng và nhấn **Thêm Bài**.
 - Hệ thống tự động trích xuất tên bài, tác giả, ảnh bìa, thời lượng và lưu trữ vào danh sách phát.
 - **Tích chọn nhiều bài**: Tích vào ô checkbox ở từng bài để chọn danh sách phát theo ý muốn.

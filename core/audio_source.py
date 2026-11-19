@@ -260,5 +260,5 @@ class StreamDispatcher:
             except Exception:
                 pass
             self.process_ytdl = None
-        if self._task and not self._task.done():
+        if self._task and not self._task.done() and self._task is not asyncio.current_task(loop=self._task.get_loop()):
             self._task.cancel()

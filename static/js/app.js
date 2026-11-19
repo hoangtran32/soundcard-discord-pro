@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initPlayerControls();
     initMultiPlatformSearch();
     initPlaylistActions();
+    initAlbums();
     initRoomActions();
     initSettingsAndBackgrounds();
 
@@ -950,11 +951,13 @@ function updateQueuePreviewList() {
     const countEl = document.getElementById('queue-preview-count');
     if (!container) return;
 
-    const selectedTracks = AppState.playlist.filter(p => p.selected);
-    countEl.innerText = `${selectedTracks.length} bài đã chọn`;
+    const albumQueue = AppState.playerState.album_queue;
+    const selectedTracks = albumQueue ? albumQueue.upcoming : AppState.playlist.filter(p => p.selected);
+    document.getElementById('queue-preview-heading').textContent = albumQueue ? `Album · ${albumQueue.name}` : 'Hàng Đợi Tiếp Theo';
+    countEl.innerText = albumQueue ? `${albumQueue.remaining} bài tiếp theo` : `${selectedTracks.length} bài đã chọn`;
 
     if (!selectedTracks.length) {
-        container.innerHTML = `<span style="font-size: 11px; color: var(--text-dim); text-align: center; display: block; padding: 8px;">Không có bài nào được chọn trong hàng đợi</span>`;
+        container.innerHTML = `<span style="font-size: 11px; color: var(--text-dim); text-align: center; display: block; padding: 8px;">${albumQueue ? 'Đã đến bài cuối của album' : 'Không có bài nào được chọn trong hàng đợi'}</span>`;
         return;
     }
 
@@ -1067,6 +1070,7 @@ function applyBackground(filename) {
 function applyConfigToUI(config) {
     if (!config) return;
     document.body.classList.toggle('shared-mode', Boolean(config.shared));
+    document.getElementById('tab-btn-albums').hidden = !config.albums_enabled;
 
     if (config.current_background) {
         applyBackground(config.current_background);
