@@ -2,14 +2,15 @@ const statusText = document.getElementById('status');
 const openPlayer = document.getElementById('open-player');
 const retry = document.getElementById('retry');
 const repo = document.documentElement.dataset.repo;
-const liveFile = `https://raw.githubusercontent.com/${repo}/soundcard-live/live.json`;
+const liveFile = `https://api.github.com/repos/${repo}/contents/live.json?ref=soundcard-live`;
 let checking = false;
 
-function fetchLive(url) {
+function fetchLive(url, headers) {
     return fetch(url, {
         cache: 'no-store',
         credentials: 'omit',
         redirect: 'error',
+        headers,
         signal: AbortSignal.timeout(6000)
     });
 }
@@ -18,7 +19,7 @@ async function checkStatus() {
     if (checking) return;
     checking = true;
     try {
-        const manifest = await fetchLive(`${liveFile}?check=${Math.floor(Date.now() / 15000)}`);
+        const manifest = await fetchLive(liveFile, { Accept: 'application/vnd.github.raw+json' });
         if (!manifest.ok) throw new Error('Address unavailable');
         const { url } = await manifest.json();
         if (typeof url !== 'string' || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) {
@@ -42,4 +43,4 @@ async function checkStatus() {
 
 retry.addEventListener('click', checkStatus);
 checkStatus();
-setInterval(checkStatus, 15000);
+setInterval(checkStatus, 75000);
