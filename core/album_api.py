@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from core.album_library import album_library
 from core.playlist_manager import playlist_manager
 from core.search_engine import search_engine
-from core.web_share import SHARED, shared_search_query, shared_track_url
+from core.web_share import SHARED, playable_search_track, shared_search_query
 
 
 COOKIE = "soundcard_profile"
@@ -43,6 +43,10 @@ class AlbumSearch(BaseModel):
 
 class TrackSelection(BaseModel):
     ids: list[str] = Field(min_length=1)
+
+
+class SearchResult(BaseModel):
+    track: dict
 
 
 def signature(value):
@@ -135,16 +139,7 @@ def delete_album(album_id: str, username: str = Depends(require_profile)):
 
 
 def save_tracks(username, album_id, candidates):
-    tracks = []
-    for track in candidates:
-        url = shared_track_url(track.get("url") or "")
-        if not url or url.startswith("https://open.spotify.com/"):
-            continue
-        fields = ("title", "duration_str", "thumbnail", "uploader", "platform")
-        item = {field: str(track.get(field) or "")[:500] for field in fields}
-        duration = track.get("duration")
-        item.update(url=url, duration=max(0, duration) if type(duration) is int else 0)
-        tracks.append(item)
+    tracks = [track for candidate in candidates if (track := playable_search_track(candidate))]
     if not tracks:
         raise HTTPException(400, "Không tìm thấy bài có thể lưu vào album. Hãy thử link YouTube hoặc SoundCloud.")
     added = album_library.add_tracks(username, album_id, tracks)
@@ -166,6 +161,11 @@ def add_playlist_tracks(album_id: str, payload: TrackSelection, username: str = 
     selected = set(payload.ids)
     tracks = [track for track in playlist_manager.get_all() if track["id"] in selected]
     return save_tracks(username, album_id, tracks)
+
+
+@router.post("/albums/{album_id}/tracks/from-search")
+def add_search_result(album_id: str, payload: SearchResult, username: str = Depends(require_profile)):
+    return save_tracks(username, album_id, [payload.track])
 
 
 @router.delete("/albums/{album_id}/tracks/{track_id}")

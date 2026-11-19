@@ -27,6 +27,8 @@ const API = {
     // Player
     getState: () => API.request('/api/state'),
     play: (id = null) => API.request('/api/player/play', { method: 'POST', body: JSON.stringify({ id }) }),
+    playSearchResult: (track) => API.request('/api/player/play-search-result', { method: 'POST', body: JSON.stringify({ track }) }),
+    saveSearchResult: (albumId, track) => API.request(`/api/albums/${encodeURIComponent(albumId)}/tracks/from-search`, { method: 'POST', body: JSON.stringify({ track }) }),
     pause: () => API.request('/api/player/pause', { method: 'POST' }),
     resume: () => API.request('/api/player/resume', { method: 'POST' }),
     stop: () => API.request('/api/player/stop', { method: 'POST' }),

@@ -103,33 +103,33 @@
                 <div class="header-search-wrap">
                     <!-- Platform Selector Pills -->
                     <div class="platform-selector">
-                        <button class="platform-pill active" data-platform="youtube" id="pill-youtube">
+                        <button class="platform-pill active" data-platform="youtube" id="pill-youtube" aria-pressed="true">
                             <i class="fa-brands fa-youtube"></i>
                             <span>YouTube</span>
                         </button>
-                        <button class="platform-pill" data-platform="soundcloud" id="pill-soundcloud">
+                        <button class="platform-pill" data-platform="soundcloud" id="pill-soundcloud" aria-pressed="false">
                             <i class="fa-brands fa-soundcloud"></i>
                             <span>SoundCloud</span>
                         </button>
-                        <button class="platform-pill" data-platform="spotify" id="pill-spotify">
+                        <button class="platform-pill" data-platform="spotify" id="pill-spotify" aria-pressed="false">
                             <i class="fa-brands fa-spotify"></i>
                             <span>Spotify</span>
                         </button>
-                        <button class="platform-pill" data-platform="url" id="pill-url">
+                        <button class="platform-pill" data-platform="url" id="pill-url" aria-pressed="false">
                             <i class="fa-solid fa-link"></i>
                             <span>Link URL</span>
                         </button>
                     </div>
 
                     <!-- Search Input Bar -->
-                    <div class="quick-add-bar">
-                        <i class="fa-solid fa-magnifying-glass search-bar-icon" id="search-input-icon"></i>
-                        <input type="text" id="quick-url-input" placeholder="Tìm kiếm bài hát trên YouTube hoặc dán link video..." autocomplete="off">
-                        <button class="btn-glass-primary" id="btn-quick-search" title="Tìm kiếm hoặc dán link">
+                    <form class="quick-add-bar" id="music-search-form" role="search">
+                        <i class="fa-solid fa-magnifying-glass search-bar-icon" aria-hidden="true"></i>
+                        <input type="search" id="quick-url-input" aria-label="Tên bài, tên kênh hoặc link video" placeholder="Tìm bài hoặc kênh trên YouTube…" autocomplete="off" maxlength="300" required>
+                        <button class="btn-glass-primary" id="btn-quick-search" type="submit" aria-controls="search-results-drawer" aria-expanded="false">
                             <i class="fa-solid fa-magnifying-glass"></i>
                             <span>Tìm Kiếm</span>
                         </button>
-                    </div>
+                    </form>
 
                     <!-- Live Search Results Dropdown/Drawer -->
                     <div class="search-results-drawer glass-card" id="search-results-drawer">
@@ -138,13 +138,20 @@
                                 <i class="fa-solid fa-list-check text-neon"></i>
                                 <span id="search-results-heading">Kết Quả Tìm Kiếm</span>
                             </div>
-                            <button class="btn-xs btn-outline-glass" id="btn-close-drawer">
+                            <button class="btn-xs btn-outline-glass" id="btn-close-drawer" type="button">
                                 <i class="fa-solid fa-xmark"></i> Đóng
                             </button>
                         </div>
-                        <div class="search-results-list" id="search-results-list">
-                            <!-- Populated dynamically -->
+                        <div class="search-save-options" id="search-save-options" hidden>
+                            <label for="search-save-destination">Lưu vào</label>
+                            <select class="glass-input" id="search-save-destination">
+                                <option value="">Danh sách chung</option>
+                            </select>
+                            <button type="button" class="btn-xs btn-outline-glass" id="search-open-albums">Album cá nhân</button>
                         </div>
+                        <p id="search-feedback" role="status" hidden></p>
+                        <ul class="search-results-list" id="search-results-list"></ul>
+                        <button type="button" class="btn-xs btn-outline-glass" id="search-more" hidden>Xem thêm</button>
                     </div>
                 </div>
 
@@ -540,6 +547,7 @@
     <script src="../static/js/api.js"></script>
     <script src="../static/js/visualizer.js"></script>
     <script src="../static/js/albums.js"></script>
+    <script src="../static/js/search.js"></script>
     <script src="../static/js/app.js"></script>
 </body>
 </html>

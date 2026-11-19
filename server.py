@@ -14,14 +14,16 @@ import os
 import glob
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Body, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 
-from core.album_api import get_owned_album, require_album_origin, require_profile, router as album_router
+from core.album_api import SearchResult, get_owned_album, require_album_origin, require_profile, router as album_router
 from core.album_library import album_library
 from core.config_manager import config_manager
 from core.playlist_manager import playlist_manager
@@ -30,7 +32,7 @@ from core.discord_streamer import streamer
 from core.search_engine import search_engine
 from core.web_share import (
     SHARED, authenticated, protect_shared_web, require_local_admin, same_origin,
-    shared_search_query, shared_search_results, shared_track_url,
+    playable_search_track, shared_search_query, shared_search_results,
 )
 
 @asynccontextmanager
@@ -90,10 +92,11 @@ room_connections = asyncio.Lock()
 
 def browser_config():
     config = config_manager.load()
+    features = {"albums_enabled": True, "search_actions_enabled": True}
     if not SHARED:
-        return {**config, "albums_enabled": True}
+        return {**config, **features}
     fields = ("current_background", "bg_blur", "bg_brightness", "glass_opacity", "volume")
-    return {**{field: config.get(field) for field in fields}, "shared": True, "albums_enabled": True}
+    return {**{field: config.get(field) for field in fields}, "shared": True, **features}
 
 
 def browser_room(room):
@@ -185,16 +188,21 @@ async def get_state():
     return streamer.get_state()
 
 # Search API (YouTube, SoundCloud, Spotify, Direct URLs)
+class SearchRequest(BaseModel):
+    query: str = ""
+    platform: str = "youtube"
+    limit: int = 8
+
+
 @app.post("/api/search")
-async def search_music(payload: Dict[str, Any] = Body(...)):
-    query = payload.get("query", "").strip()
-    platform = payload.get("platform", "youtube").lower()
-    limit = int(payload.get("limit", 8))
+async def search_music(payload: SearchRequest):
+    query = payload.query.strip()
+    platform = payload.platform.lower()
+    limit = max(1, min(payload.limit, 24))
     if not query:
         return {"results": []}
     if SHARED:
         query = shared_search_query(query)
-        limit = max(1, min(limit, 12))
     results = await search_engine.search(query, platform=platform, limit=limit)
     if SHARED:
         results = shared_search_results(results)
@@ -232,6 +240,15 @@ async def player_play(payload: Dict[str, Any] = Body(default={})):
         return {"status": "ok", "playing": all_tracks[0]}
 
     return {"status": "empty_playlist"}
+
+@app.post("/api/player/play-search-result")
+async def play_search_result(payload: SearchResult):
+    track = playable_search_track(payload.track, provider_only=SHARED)
+    if track is None:
+        raise HTTPException(400, "Không phát được bài từ nguồn này.")
+    track["id"] = uuid4().hex
+    await play_in_selected_rooms(track)
+    return {"status": "ok", "playing": track}
 
 @app.post("/api/albums/{album_id}/play", dependencies=[Depends(require_album_origin)])
 async def play_album(album_id: str, payload: Dict[str, Any] = Body(default={}),
@@ -332,15 +349,9 @@ async def playlist_add_direct(payload: Dict[str, Any] = Body(...)):
     if not item:
         raise HTTPException(status_code=400, detail="Track data required")
     if SHARED:
-        if not isinstance(item, dict) or not isinstance(item.get("url"), str):
-            raise HTTPException(status_code=400, detail="Dữ liệu bài hát không hợp lệ.")
-        url = shared_track_url(item["url"])
-        if not url or url.startswith("https://open.spotify.com/"):
+        item = playable_search_track(item)
+        if item is None:
             raise HTTPException(status_code=400, detail="Hãy tìm bài bằng thanh tìm kiếm trước khi thêm.")
-        fields = ("title", "duration_str", "thumbnail", "uploader", "platform")
-        duration = item.get("duration")
-        item = {field: str(item.get(field) or "")[:500] for field in fields}
-        item.update(url=url, duration=max(0, duration) if type(duration) is int else 0)
     added = playlist_manager.add_item_direct(item)
     return {"status": "ok", "track": added, "total": len(playlist_manager.get_all())}
 

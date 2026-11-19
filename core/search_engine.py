@@ -4,6 +4,13 @@ import uuid
 import requests
 import yt_dlp
 from typing import List, Dict, Any, Optional
+from urllib.parse import urlsplit
+
+
+def normalize_source_url(query: str) -> str:
+    if re.match(r"(?:(?:www|m|music|open|api)\.)?(?:youtube\.com|youtu\.be|soundcloud\.com|spotify\.com)/", query, re.I):
+        return "https://" + query
+    return query
 
 def format_duration(seconds: Optional[int]) -> str:
     if not seconds:
@@ -23,16 +30,17 @@ class MusicSearchEngine:
         return re.sub(r'\(Official\s*(Music\s*)?Video\)|\[Official\s*(Music\s*)?Video\]|\(Lyrics\)|\[Lyrics\]|\(Official Audio\)', '', title, flags=re.IGNORECASE).strip()
 
     async def search(self, query: str, platform: str = "youtube", limit: int = 8) -> List[Dict[str, Any]]:
-        query = query.strip()
+        query = normalize_source_url(query.strip())
         if not query:
             return []
 
-        # If it's a Spotify link, handle via Spotify oEmbed
-        if "open.spotify.com" in query:
-            return await self._resolve_spotify_link(query)
-
-        # If it's a direct URL, extract directly
-        if query.startswith(("http://", "https://")):
+        if query.lower().startswith(("http://", "https://")):
+            try:
+                host = urlsplit(query).hostname
+            except ValueError:
+                return []
+            if host == "open.spotify.com":
+                return await self._resolve_spotify_link(query)
             return await self._extract_direct_url(query)
 
         platform = platform.lower()
@@ -61,7 +69,10 @@ class MusicSearchEngine:
                     for e in entries:
                         if not e:
                             continue
-                        url = e.get('url') or e.get('webpage_url') or f"https://www.youtube.com/watch?v={e.get('id')}"
+                        video_id = e.get('id')
+                        url = f"https://www.youtube.com/watch?v={video_id}" if video_id else e.get('webpage_url') or e.get('url')
+                        if not url:
+                            continue
                         thumb = e.get('thumbnail') or (e.get('thumbnails')[-1].get('url') if e.get('thumbnails') else '')
                         dur = e.get('duration') or 0
                         results.append({
@@ -71,7 +82,8 @@ class MusicSearchEngine:
                             'duration': int(dur),
                             'duration_str': format_duration(dur),
                             'thumbnail': thumb,
-                            'uploader': e.get('uploader') or e.get('channel') or 'YouTube',
+                            'uploader': e.get('channel') or e.get('uploader') or 'YouTube',
+                            'view_count': e.get('view_count'),
                             'platform': 'youtube'
                         })
                     return results
@@ -164,8 +176,7 @@ class MusicSearchEngine:
         def _exec():
             try:
                 # Use Spotify public oEmbed endpoint
-                oembed_url = f"https://open.spotify.com/oembed?url={spotify_url}"
-                r = requests.get(oembed_url, timeout=5)
+                r = requests.get("https://open.spotify.com/oembed", params={"url": spotify_url}, timeout=5)
                 if r.status_code == 200:
                     data = r.json()
                     track_title = data.get('title', '')
@@ -217,6 +228,7 @@ class MusicSearchEngine:
                 'no_warnings': True,
                 'extract_flat': True,
                 'skip_download': True,
+                'js_runtimes': {'node': {}},
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:
@@ -237,7 +249,8 @@ class MusicSearchEngine:
                             'duration': int(dur),
                             'duration_str': format_duration(dur),
                             'thumbnail': thumb,
-                            'uploader': e.get('uploader') or platform.capitalize(),
+                            'uploader': e.get('channel') or e.get('uploader') or platform.capitalize(),
+                            'view_count': e.get('view_count'),
                             'platform': platform
                         })
                     return results

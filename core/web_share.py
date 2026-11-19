@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from fastapi import HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse, Response
+from core.search_engine import normalize_source_url
 
 
 PASSWORD = os.environ.get("SOUNDCARD_SHARE_PASSWORD")
@@ -98,11 +99,32 @@ def shared_track_url(value: str) -> str | None:
 
 
 def shared_search_query(query: str) -> str:
-    if len(query) <= 300 and "://" not in query and "open.spotify.com" not in query:
-        return query
-    if (url := shared_track_url(query)) and len(query) <= 300:
+    query = normalize_source_url(query)
+    if len(query) <= 300 and (url := shared_track_url(query)):
         return url
+    if len(query) <= 300 and "://" not in query:
+        return query
     raise HTTPException(status_code=400, detail="Hãy nhập tên bài hoặc link một bài YouTube, SoundCloud hay Spotify.")
+
+
+def playable_search_track(item: object, provider_only: bool = True) -> dict | None:
+    if not isinstance(item, dict) or not isinstance(item.get("url"), str):
+        return None
+    raw_url = item["url"]
+    url = shared_track_url(raw_url)
+    if url is None and not provider_only:
+        try:
+            parsed = urlsplit(raw_url)
+            if parsed.scheme in {"http", "https"} and parsed.hostname:
+                url = raw_url
+        except ValueError:
+            return None
+    if not url or url.startswith("https://open.spotify.com/"):
+        return None
+    fields = ("title", "duration_str", "thumbnail", "uploader", "platform")
+    track = {field: str(item.get(field) or "")[:500] for field in fields}
+    duration = item.get("duration")
+    return {**track, "url": url, "duration": max(0, duration) if type(duration) is int else 0}
 
 
 def shared_search_results(results: list[dict]) -> list[dict]:

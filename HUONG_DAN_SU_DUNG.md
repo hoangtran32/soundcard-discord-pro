@@ -54,6 +54,9 @@ GitHub có thể lưu mã nguồn. GitHub Pages chỉ phục vụ file tĩnh. B�
 ## 🚀 Các Tính Năng Nổi Bật
 
 ### 1. 🎵 Trình Phát Nhạc & Bộ Điều Khiển (Now Playing)
+
+- Chọn **YouTube** rồi gõ tên bài, nghệ sĩ hoặc tên kênh ngay trong SoundCard. Kết quả hiện tên video, kênh, ảnh và thời lượng khi có dữ liệu. Có thể dán link video hoặc chọn **SoundCloud** để tìm ở nguồn đó.
+- Dùng **Phát ngay** để bot phát video đã chọn. Để lưu, chọn **Danh sách chung** hoặc một album ở ô **Lưu vào**, rồi bấm **Lưu** trên bài muốn cất. Nút **Đăng nhập album** mở nơi tạo hồ sơ và album cá nhân.
 - Đĩa nhạc Vinyl xoay tròn chuyển động theo điệu nhạc.
 - Hiệu ứng sóng nhạc **Spectrum Visualizer** chuyển động theo dải tần số âm thanh thời gian thực.
 - Đầy đủ nút điều khiển: Phát / Tạm dừng, Dừng hẳn, Chuyển bài trước / sau, Phát ngẫu nhiên (Shuffle), Chế độ lặp lại (Tắt / Lặp 1 bài / Lặp danh sách).
