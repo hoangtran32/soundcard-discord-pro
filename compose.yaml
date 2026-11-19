@@ -1,0 +1,34 @@
+services:
+  soundcard:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./deploy-state
+        target: /app/data
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "from http.client import HTTPConnection; c = HTTPConnection('127.0.0.1', 8000, timeout=2); c.request('GET', '/api/state'); assert c.getresponse().status == 401"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    depends_on:
+      soundcard:
+        condition: service_healthy
+    environment:
+      SOUNDCARD_HOST: ${SOUNDCARD_HOST:?Set the public IP address or DNS hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  caddy-data:

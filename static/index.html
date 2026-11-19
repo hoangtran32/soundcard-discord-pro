@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundCard Discord - Trình Phát Nhạc Kênh Thoại Đa Kênh</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="../static/css/style.css">
+</head>
+<body>
+    <!-- Background Image Layer with Dynamic Blur -->
+    <div id="bg-layer" class="bg-layer"></div>
+    <div id="bg-overlay" class="bg-overlay"></div>
+
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Glass Sidebar Navigation -->
+        <aside class="glass-sidebar">
+            <div class="brand-header">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-compact-disc fa-spin brand-icon"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>SoundCard</h2>
+                    <span class="badge-tag">DISCORD PRO</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="now-playing" id="tab-btn-playing">
+                    <i class="fa-solid fa-music"></i>
+                    <span>Trình Phát</span>
+                    <div class="active-glow"></div>
+                </button>
+                <button class="nav-item" data-tab="playlist" id="tab-btn-playlist">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>Danh Sách Nhạc</span>
+                    <span class="nav-counter" id="playlist-count-badge">0</span>
+                    <div class="active-glow"></div>
+                </button>
+                <button class="nav-item" data-tab="rooms" id="tab-btn-rooms">
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                    <span>Kênh Thoại (Phòng)</span>
+                    <span class="nav-counter live-pulse" id="rooms-count-badge">0</span>
+                    <div class="active-glow"></div>
+                </button>
+                <button class="nav-item" data-tab="settings" id="tab-btn-settings" data-owner-only>
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Hình Nền & Cài Đặt</span>
+                    <div class="active-glow"></div>
+                </button>
+            </nav>
+
+            <!-- Quick Voice Broadcast Widget -->
+            <div class="sidebar-widget glass-card">
+                <div class="widget-header">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span>Trạng Thái Phát Kênh</span>
+                </div>
+                <div class="widget-body">
+                    <div class="widget-stat">
+                        <span class="stat-label">Phòng chọn:</span>
+                        <span class="stat-val" id="sb-selected-rooms">0</span>
+                    </div>
+                    <div class="widget-stat">
+                        <span class="stat-label">Đang trực tuyến:</span>
+                        <span class="stat-val text-success" id="sb-active-rooms">0</span>
+                    </div>
+                </div>
+                <div class="widget-actions">
+                    <button class="btn-sm btn-primary-glass" id="sb-quick-connect-btn" title="Kết nối tất cả phòng đã chọn">
+                        <i class="fa-solid fa-plug"></i> Kết Nối Tất Cả
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot-offline" id="server-status-dot" aria-hidden="true"></span>
+                    <span id="server-status-text" role="status">Đang kết nối máy chủ…</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="file-preview-notice glass-card" id="file-preview-notice" hidden>
+                <strong>Bản xem trước từ tệp HTML</strong>
+                <p>Để phát nhạc, mở link HTTPS được chia sẻ hoặc chạy <code>Chay_SoundCard_Discord.bat</code> trên máy này.</p>
+            </div>
+            <!-- Top Header Bar with Multi-Platform Search Engine -->
+            <header class="top-header glass-card">
+                <div class="header-search-wrap">
+                    <!-- Platform Selector Pills -->
+                    <div class="platform-selector">
+                        <button class="platform-pill active" data-platform="youtube" id="pill-youtube">
+                            <i class="fa-brands fa-youtube"></i>
+                            <span>YouTube</span>
+                        </button>
+                        <button class="platform-pill" data-platform="soundcloud" id="pill-soundcloud">
+                            <i class="fa-brands fa-soundcloud"></i>
+                            <span>SoundCloud</span>
+                        </button>
+                        <button class="platform-pill" data-platform="spotify" id="pill-spotify">
+                            <i class="fa-brands fa-spotify"></i>
+                            <span>Spotify</span>
+                        </button>
+                        <button class="platform-pill" data-platform="url" id="pill-url">
+                            <i class="fa-solid fa-link"></i>
+                            <span>Link URL</span>
+                        </button>
+                    </div>
+
+                    <!-- Search Input Bar -->
+                    <div class="quick-add-bar">
+                        <i class="fa-solid fa-magnifying-glass search-bar-icon" id="search-input-icon"></i>
+                        <input type="text" id="quick-url-input" placeholder="Tìm kiếm bài hát trên YouTube hoặc dán link video..." autocomplete="off">
+                        <button class="btn-glass-primary" id="btn-quick-search" title="Tìm kiếm hoặc dán link">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>Tìm Kiếm</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Search Results Dropdown/Drawer -->
+                    <div class="search-results-drawer glass-card" id="search-results-drawer">
+                        <div class="drawer-header">
+                            <div class="drawer-title">
+                                <i class="fa-solid fa-list-check text-neon"></i>
+                                <span id="search-results-heading">Kết Quả Tìm Kiếm</span>
+                            </div>
+                            <button class="btn-xs btn-outline-glass" id="btn-close-drawer">
+                                <i class="fa-solid fa-xmark"></i> Đóng
+                            </button>
+                        </div>
+                        <div class="search-results-list" id="search-results-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-status-wrap">
+                    <div class="vu-meter-header" title="Mức âm lượng SoundCard">
+                        <span class="vu-label">VU</span>
+                        <div class="vu-track">
+                            <div class="vu-fill" id="header-vu-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Tab 1: Now Playing (Trình Phát) -->
+            <section class="tab-content active" id="tab-now-playing">
+                <div class="player-layout">
+                    <!-- Left: Vinyl / Art + Visualizer -->
+                    <div class="player-left-col glass-card">
+                        <div class="art-stage">
+                            <div class="disc-container" id="disc-container">
+                                <div class="disc-vinyl" id="disc-vinyl">
+                                    <img src="../static/icons/default_cover.png" alt="Cover" id="now-playing-cover" data-cover>
+                                </div>
+                                <div class="disc-hole"></div>
+                            </div>
+                            <!-- Canvas Spectrum Visualizer -->
+                            <canvas id="visualizer-canvas" class="visualizer-canvas"></canvas>
+                        </div>
+
+                        <!-- Track Info -->
+                        <div class="track-details">
+                            <h1 class="track-title" id="now-playing-title">Chưa phát bài hát nào</h1>
+                            <p class="track-artist" id="now-playing-artist">Tìm kiếm bài hát hoặc dán link phía trên</p>
+                        </div>
+
+                        <!-- Progress Bar & Seek -->
+                        <div class="progress-container">
+                            <div class="time-display" id="time-current">00:00</div>
+                            <div class="progress-bar-wrap" id="progress-bar-wrap">
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" id="progress-fill"></div>
+                                    <div class="progress-thumb" id="progress-thumb"></div>
+                                </div>
+                            </div>
+                            <div class="time-display" id="time-total">00:00</div>
+                        </div>
+
+                        <!-- Control Buttons -->
+                        <div class="player-controls">
+                            <button class="ctrl-btn btn-secondary" id="btn-shuffle" title="Phát ngẫu nhiên">
+                                <i class="fa-solid fa-shuffle"></i>
+                            </button>
+                            <button class="ctrl-btn btn-secondary" id="btn-prev" title="Bài trước">
+                                <i class="fa-solid fa-backward-step"></i>
+                            </button>
+                            <button class="ctrl-btn btn-play-main" id="btn-play-pause" title="Phát / Tạm dừng">
+                                <i class="fa-solid fa-play" id="icon-play-pause"></i>
+                            </button>
+                            <button class="ctrl-btn btn-secondary" id="btn-stop" title="Dừng hẳn">
+                                <i class="fa-solid fa-stop"></i>
+                            </button>
+                            <button class="ctrl-btn btn-secondary" id="btn-next" title="Bài tiếp">
+                                <i class="fa-solid fa-forward-step"></i>
+                            </button>
+                            <button class="ctrl-btn btn-secondary" id="btn-repeat" title="Chế độ lặp (Tắt / 1 bài / Tất cả)">
+                                <i class="fa-solid fa-repeat"></i>
+                                <span class="repeat-badge" id="repeat-badge">OFF</span>
+                            </button>
+                        </div>
+
+                        <!-- Volume Slider -->
+                        <div class="volume-container">
+                            <i class="fa-solid fa-volume-high" id="vol-icon"></i>
+                            <div class="volume-slider-wrap">
+                                <input type="range" id="vol-slider" min="0" max="200" value="100" class="custom-slider">
+                            </div>
+                            <span class="vol-text" id="vol-text">100%</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Active Broadcasting Channels -->
+                    <div class="player-right-col glass-card">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <i class="fa-solid fa-satellite-dish text-neon"></i>
+                                <h3>Đang Phát Vào Các Kênh Thoại</h3>
+                            </div>
+                            <button class="btn-xs btn-outline-glass" id="btn-refresh-rooms-live">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                        </div>
+
+                        <div class="active-channels-list" id="active-rooms-live-list">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state">
+                                <i class="fa-solid fa-tower-broadcast empty-icon"></i>
+                                <p>Chưa có kênh thoại nào được kết nối.</p>
+                                <span class="empty-sub">Hãy vào mục <strong>Kênh Thoại</strong> để thêm và kết nối phòng!</span>
+                            </div>
+                        </div>
+
+                        <div class="live-queue-preview">
+                            <div class="preview-header">
+                                <span><i class="fa-solid fa-list-ol"></i> Hàng Đợi Tiếp Theo</span>
+                                <span class="queue-count" id="queue-preview-count">0 bài đã chọn</span>
+                            </div>
+                            <div class="preview-list" id="queue-preview-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 2: Playlist (Danh Sách Nhạc) -->
+            <section class="tab-content" id="tab-playlist">
+                <div class="tab-pane-container glass-card">
+                    <div class="pane-header">
+                        <div class="pane-title-group">
+                            <h2><i class="fa-solid fa-music-note"></i> Thư Viện & Danh Sách Bài Hát</h2>
+                            <p class="subtitle">Tích chọn 1 hoặc nhiều bài để phát tuần tự hoặc lặp lại</p>
+                        </div>
+                        <div class="pane-actions">
+                            <button class="btn-glass-accent" id="btn-play-selected" title="Phát các bài đã tích chọn">
+                                <i class="fa-solid fa-circle-play"></i> Phát Các Bài Đã Chọn
+                            </button>
+                            <button class="btn-glass-secondary" id="btn-select-all-tracks">
+                                <i class="fa-regular fa-square-check"></i> Chọn Tất Cả
+                            </button>
+                            <button class="btn-glass-secondary" id="btn-deselect-all-tracks">
+                                <i class="fa-regular fa-square"></i> Bỏ Chọn
+                            </button>
+                            <button class="btn-glass-danger" id="btn-clear-playlist">
+                                <i class="fa-solid fa-trash-can"></i> Xóa Tất Cả
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Filter Bar -->
+                    <div class="filter-bar">
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-filter"></i>
+                            <input type="text" id="playlist-search-input" placeholder="Lọc nhanh bài hát trong danh sách phát...">
+                        </div>
+                        <div class="playlist-stats-info">
+                            <span>Đã chọn: <strong id="pl-selected-count">0</strong> / <span id="pl-total-count">0</span> bài</span>
+                        </div>
+                    </div>
+
+                    <!-- Playlist Table / Cards -->
+                    <div class="playlist-scroll-area">
+                        <div class="playlist-items" id="playlist-items-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 3: Rooms (Kênh Thoại Discord) -->
+            <section class="tab-content" id="tab-rooms">
+                <div class="tab-pane-container glass-card">
+                    <div class="pane-header">
+                        <div class="pane-title-group">
+                            <h2><i class="fa-solid fa-tower-broadcast"></i> Quản Lý Kênh Thoại Discord</h2>
+                            <p class="subtitle">Tích chọn 1 hoặc nhiều phòng để phát trực tiếp cùng một lúc (Multi-Room Streaming)</p>
+                        </div>
+                        <div class="pane-actions">
+                            <button class="btn-glass-accent" id="btn-open-add-room-modal" data-owner-only>
+                                <i class="fa-solid fa-plus"></i> Thêm Kênh Thoại Mới
+                            </button>
+                            <button class="btn-glass-primary" id="btn-connect-all-selected">
+                                <i class="fa-solid fa-plug"></i> Kết Nối Phòng Đã Chọn
+                            </button>
+                            <button class="btn-glass-secondary" id="btn-disconnect-all">
+                                <i class="fa-solid fa-power-off"></i> Ngắt Kết Nối Tất Cả
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="room-filter-bar">
+                        <div class="room-actions-left">
+                            <button class="btn-sm btn-outline-glass" id="btn-select-all-rooms">
+                                <i class="fa-regular fa-square-check"></i> Chọn Tất Cả Phòng
+                            </button>
+                            <button class="btn-sm btn-outline-glass" id="btn-deselect-all-rooms">
+                                <i class="fa-regular fa-square"></i> Bỏ Chọn
+                            </button>
+                        </div>
+                        <div class="room-stats-badge">
+                            <span>Phòng được chọn phát: <strong id="room-selected-stat">0</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Rooms Grid -->
+                    <div class="rooms-scroll-area">
+                        <div class="rooms-grid" id="rooms-grid">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab 4: Background & Settings -->
+            <section class="tab-content" id="tab-settings">
+                <div class="tab-pane-container glass-card">
+                    <div class="pane-header">
+                        <div class="pane-title-group">
+                            <h2><i class="fa-solid fa-sliders"></i> Tùy Chỉnh Giao Diện & Cài Đặt Bot</h2>
+                            <p class="subtitle">Tùy biến hình nền kính mờ từ thư mục <code>background/</code> và cấu hình Discord Token</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-grid">
+                        <!-- Left: Background Customizer -->
+                        <div class="settings-card glass-subcard">
+                            <div class="subcard-header">
+                                <i class="fa-solid fa-image"></i>
+                                <h3>Bộ Sưu Tập Hình Nền (Thư Mục `background/`)</h3>
+                            </div>
+                            <p class="subcard-desc">Chọn ảnh nền yêu thích hoặc thả thêm file ảnh vào thư mục <code>background</code> để dùng ngay.</p>
+                            
+                            <!-- Backgrounds Carousel / Grid -->
+                            <div class="bg-gallery-grid" id="bg-gallery-grid">
+                                <!-- Populated dynamically -->
+                            </div>
+
+                            <div class="bg-sliders-group">
+                                <div class="slider-field">
+                                    <div class="slider-label-row">
+                                        <span><i class="fa-solid fa-wand-magic-sparkles"></i> Độ Mờ Nền (Blur)</span>
+                                        <span id="label-blur-val">15px</span>
+                                    </div>
+                                    <input type="range" id="slider-blur" min="0" max="40" value="15" class="custom-slider">
+                                </div>
+
+                                <div class="slider-field">
+                                    <div class="slider-label-row">
+                                        <span><i class="fa-solid fa-sun"></i> Độ Sáng Nền (Brightness)</span>
+                                        <span id="label-bright-val">65%</span>
+                                    </div>
+                                    <input type="range" id="slider-brightness" min="20" max="100" value="65" class="custom-slider">
+                                </div>
+
+                                <div class="slider-field">
+                                    <div class="slider-label-row">
+                                        <span><i class="fa-solid fa-cube"></i> Độ Trong Suốt Kính (Glass Opacity)</span>
+                                        <span id="label-opacity-val">65%</span>
+                                    </div>
+                                    <input type="range" id="slider-opacity" min="20" max="95" value="65" class="custom-slider">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Discord Bot Configuration -->
+                        <div class="settings-card glass-subcard">
+                            <div class="subcard-header">
+                                <i class="fa-brands fa-discord text-discord"></i>
+                                <h3>Cấu Hình Discord Bot API</h3>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="setting-global-token">Discord Bot Token (Chính):</label>
+                                <div class="input-password-wrap">
+                                    <input type="password" id="setting-global-token" placeholder="Dán Discord Bot Token tại đây..." autocomplete="off">
+                                    <button class="btn-toggle-token" id="btn-toggle-token-eye" type="button">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </button>
+                                </div>
+                                <span class="help-text">Token này sẽ được dùng mặc định cho tất cả các phòng thoại không có token riêng.</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="setting-bitrate">Chất Lượng Âm Thanh (Bitrate):</label>
+                                <select id="setting-bitrate" class="glass-select">
+                                    <option value="64">64 kbps (Tiết kiệm băng thông)</option>
+                                    <option value="96">96 kbps (Chuẩn Discord tiêu chuẩn)</option>
+                                    <option value="128" selected>128 kbps (Khuyên dùng - Cân bằng tốt)</option>
+                                    <option value="192">192 kbps (Chất lượng cao - High Fidelity)</option>
+                                    <option value="384">384 kbps (Chất lượng phòng thu Discord Nitro)</option>
+                                </select>
+                            </div>
+
+                            <button class="btn-glass-primary w-100" id="btn-save-settings">
+                                <i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình
+                            </button>
+
+                            <!-- Discord Bot Setup Quick Guide -->
+                            <div class="guide-box">
+                                <h4><i class="fa-solid fa-circle-question"></i> Hướng Dẫn Nhanh Tạo Bot Discord:</h4>
+                                <ol>
+                                    <li>Truy cập <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>.</li>
+                                    <li>Tạo <strong>New Application</strong> &rarr; chọn mục <strong>Bot</strong> &rarr; nhấn <strong>Reset Token</strong> và copy Token.</li>
+                                    <li>Bật các quyền <strong>Privileged Gateway Intents</strong> (Server Members Intent, Message Content Intent).</li>
+                                    <li>Mục <strong>OAuth2 &rarr; URL Generator</strong>: tích chọn <code>bot</code>, các quyền <code>Connect</code>, <code>Speak</code>, <code>Use Voice Activity</code> và dùng link để mời bot vào server của bạn!</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: Add / Edit Room -->
+    <div class="modal-overlay" id="modal-room">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <h3 id="modal-room-title"><i class="fa-solid fa-tower-broadcast"></i> Thêm Kênh Thoại Discord</h3>
+                <button class="btn-close-modal" id="btn-close-modal-room"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="room-edit-id" value="">
+                <div class="form-group">
+                    <label>Tên Kênh (Gợi nhớ):</label>
+                    <input type="text" id="room-input-name" class="glass-input" placeholder="Ví dụ: Phòng Nghe Nhạc 1, Kênh Chill...">
+                </div>
+                <div class="form-group">
+                    <label>Guild ID (ID Máy Chủ Discord): <span class="text-danger">*</span></label>
+                    <input type="text" id="room-input-guild" class="glass-input" placeholder="Ví dụ: 123456789012345678">
+                </div>
+                <div class="form-group">
+                    <label>Voice Channel ID (ID Kênh Thoại): <span class="text-danger">*</span></label>
+                    <input type="text" id="room-input-channel" class="glass-input" placeholder="Ví dụ: 987654321098765432">
+                </div>
+                <div class="form-group">
+                    <label>Bot Token Riêng (Không bắt buộc):</label>
+                    <input type="password" id="room-input-token" class="glass-input" placeholder="Để trống nếu muốn dùng Token chính trong Cài Đặt">
+                    <span class="help-text">Nếu muốn phát đồng thời vào 2 kênh trong cùng 1 Server, cần 2 Token Bot khác nhau.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-glass-secondary" id="btn-cancel-modal-room">Hủy</button>
+                <button class="btn-glass-accent" id="btn-save-room"><i class="fa-solid fa-check"></i> Lưu Kênh Thoại</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="../static/js/api.js"></script>
+    <script src="../static/js/visualizer.js"></script>
+    <script src="../static/js/app.js"></script>
+</body>
+</html>

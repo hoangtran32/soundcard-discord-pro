@@ -1,0 +1,81 @@
+/**
+ * Audio Spectrum Canvas Visualizer
+ */
+class VisualizerRenderer {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this.bars = 32;
+        this.spectrumData = new Array(this.bars).fill(0);
+        this.targetData = new Array(this.bars).fill(0);
+        this.vu = 0;
+        this.targetVu = 0;
+        
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        this.animate();
+    }
+
+    resize() {
+        if (!this.canvas) return;
+        this.canvas.width = this.canvas.parentElement.clientWidth || 300;
+        this.canvas.height = 60;
+    }
+
+    updateData(spectrum16, vu) {
+        this.targetVu = vu || 0;
+        if (Array.isArray(spectrum16)) {
+            // Expand 16 bands to 32 bars with interpolation
+            for (let i = 0; i < this.bars; i++) {
+                const srcIdx = Math.floor(i / 2);
+                this.targetData[i] = (spectrum16[srcIdx] || 0) * 0.8;
+            }
+        }
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        if (!this.ctx) return;
+
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        this.ctx.clearRect(0, 0, w, h);
+
+        // Smooth lerp
+        this.vu += (this.targetVu - this.vu) * 0.25;
+
+        const barWidth = (w / this.bars) - 3;
+        const gradient = this.ctx.createLinearGradient(0, h, 0, 0);
+        gradient.addColorStop(0, '#00f2fe');
+        gradient.addColorStop(0.6, '#4facfe');
+        gradient.addColorStop(1, '#ff007f');
+
+        for (let i = 0; i < this.bars; i++) {
+            // Smoothly ease towards target with decay
+            this.spectrumData[i] += (this.targetData[i] - this.spectrumData[i]) * 0.25;
+            this.targetData[i] = Math.max(0, this.targetData[i] * 0.88);
+
+            const val = this.spectrumData[i] + (this.vu * 20 * Math.sin(i * 0.4));
+            const barHeight = Math.max(3, (val / 100) * h * 0.9);
+
+            const x = i * (barWidth + 3);
+            const y = h - barHeight;
+
+            // Draw rounded bar
+            this.ctx.fillStyle = gradient;
+            this.ctx.shadowColor = 'rgba(0, 242, 254, 0.5)';
+            this.ctx.shadowBlur = barHeight > 10 ? 8 : 0;
+
+            this.ctx.beginPath();
+            this.ctx.roundRect(x, y, barWidth, barHeight, [3, 3, 0, 0]);
+            this.ctx.fill();
+        }
+    }
+}
+
+let visualizerInstance = null;
+document.addEventListener('DOMContentLoaded', () => {
+    visualizerInstance = new VisualizerRenderer('visualizer-canvas');
+});

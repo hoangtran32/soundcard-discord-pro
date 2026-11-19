@@ -1,0 +1,16 @@
+**
+!Dockerfile
+!requirements.txt
+!server.py
+!deploy/
+!deploy/start_cloud.py
+!core/
+!core/*.py
+!static/
+!static/**
+!background/
+!background/*.jpg
+!background/*.jpeg
+!background/*.png
+!background/*.webp
+!background/*.gif
