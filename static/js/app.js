@@ -129,7 +129,7 @@ function initNavigation() {
             const targetEl = document.getElementById(`tab-${targetTab}`);
             if (targetEl) targetEl.classList.add('active');
 
-            if (targetTab === 'playlist') renderPlaylist();
+            if (targetTab === 'playlist') renderPlaylistRows();
             if (targetTab === 'settings' && !AppState.config.shared) loadBackgroundGallery();
         });
     });
@@ -351,6 +351,8 @@ function updateRepeatUI(mode) {
 }
 
 // --- Playlist Management ---
+let renderedPlaylistFilter;
+
 function initPlaylistActions() {
     // Play selected
     document.getElementById('btn-play-selected').addEventListener('click', async () => {
@@ -388,10 +390,7 @@ function initPlaylistActions() {
 
     // Search filter
     const searchInput = document.getElementById('playlist-search-input');
-    searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase().trim();
-        renderPlaylist(query);
-    });
+    searchInput.addEventListener('input', renderPlaylistRows);
 }
 
 async function refreshPlaylist() {
@@ -399,11 +398,18 @@ async function refreshPlaylist() {
     renderPlaylist();
 }
 
-function renderPlaylist(searchQuery = document.getElementById('playlist-search-input').value.toLowerCase().trim()) {
+function renderPlaylist() {
+    renderedPlaylistFilter = undefined;
     updateSelectedCounts();
+    renderPlaylistRows();
+}
+
+function renderPlaylistRows() {
     if (!document.getElementById('tab-playlist').classList.contains('active')) return;
+    const searchQuery = document.getElementById('playlist-search-input').value.toLowerCase().trim();
+    if (searchQuery === renderedPlaylistFilter) return;
     const container = document.getElementById('playlist-items-list');
-    container.innerHTML = '';
+    renderedPlaylistFilter = searchQuery;
 
     const filtered = AppState.playlist.filter(item => {
         if (!searchQuery) return true;
@@ -477,13 +483,13 @@ function renderPlaylist(searchQuery = document.getElementById('playlist-search-i
         row.querySelector('.btn-delete-track').addEventListener('click', async () => {
             await API.deleteTrack(track.id);
             AppState.playlist = AppState.playlist.filter(p => p.id !== track.id);
-            renderPlaylist(searchQuery);
+            renderPlaylist();
             showToast('Đã xóa bài hát khỏi danh sách', 'info');
         });
 
         rows.appendChild(row);
     });
-    container.appendChild(rows);
+    container.replaceChildren(rows);
 }
 
 function highlightActivePlaylistItem(currentTrackId) {
