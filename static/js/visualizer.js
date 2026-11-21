@@ -14,7 +14,6 @@ class VisualizerRenderer {
         this.playing = false;
         this.visible = false;
         this.frame = null;
-        this.lastPaint = 0;
         
         window.addEventListener('resize', () => this.resize());
         document.addEventListener('visibilitychange', () => this.scheduleDraw());
@@ -59,49 +58,38 @@ class VisualizerRenderer {
 
     scheduleDraw() {
         if (this.frame === null && this.visible && !document.hidden) {
-            this.frame = requestAnimationFrame(timestamp => this.animate(timestamp));
+            this.frame = requestAnimationFrame(() => this.draw());
         }
     }
 
-    animate(timestamp) {
+    draw() {
         this.frame = null;
         if (!this.visible || document.hidden || !this.gradient) return;
-        if (this.playing) {
-            this.scheduleDraw();
-            if (timestamp - this.lastPaint < 31) return;
-        }
-        this.lastPaint = timestamp;
 
         const w = this.canvas.width;
         const h = this.canvas.height;
 
         this.ctx.clearRect(0, 0, w, h);
 
-        // Smooth lerp
-        this.vu += (this.targetVu - this.vu) * 0.25;
+        this.vu += (this.targetVu - this.vu) * 0.6;
 
-        const barWidth = (w / this.bars) - 3;
+        const step = w / this.bars;
+        const barWidth = Math.max(1, step - 3);
         this.ctx.fillStyle = this.gradient;
+        this.ctx.beginPath();
 
         for (let i = 0; i < this.bars; i++) {
-            // Smoothly ease towards target with decay
-            this.spectrumData[i] += (this.targetData[i] - this.spectrumData[i]) * 0.25;
-            this.targetData[i] = Math.max(0, this.targetData[i] * 0.88);
+            this.spectrumData[i] += (this.targetData[i] - this.spectrumData[i]) * 0.6;
 
             const val = this.spectrumData[i] + (this.vu * 20 * Math.sin(i * 0.4));
             const barHeight = Math.max(3, (val / 100) * h * 0.9);
 
-            const x = i * (barWidth + 3);
+            const x = i * step;
             const y = h - barHeight;
 
-            // Draw rounded bar
-            this.ctx.shadowColor = 'rgba(0, 242, 254, 0.5)';
-            this.ctx.shadowBlur = barHeight > 10 ? 8 : 0;
-
-            this.ctx.beginPath();
             this.ctx.roundRect(x, y, barWidth, barHeight, [3, 3, 0, 0]);
-            this.ctx.fill();
         }
+        this.ctx.fill();
     }
 }
 

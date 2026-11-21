@@ -306,8 +306,8 @@ function updatePlayerUI(state) {
         visualizerInstance.updateData(state.spectrum, state.vu_meter, Boolean(isPlaying));
     }
     if (state.vu_meter !== previous.vu_meter) {
-        const vuPercent = Math.min(100, (state.vu_meter || 0) * 100);
-        document.getElementById('header-vu-fill').style.width = `${vuPercent}%`;
+        const vuLevel = Math.min(1, state.vu_meter || 0);
+        document.getElementById('header-vu-fill').style.transform = `scaleX(${vuLevel})`;
     }
     if (state.repeat_mode !== previous.repeat_mode) updateRepeatUI(state.repeat_mode);
     if (state.shuffle !== previous.shuffle) {
@@ -850,24 +850,24 @@ function initSettingsAndBackgrounds() {
         const val = e.target.value;
         labelBlur.innerText = `${val}px`;
         document.documentElement.style.setProperty('--glass-blur', `${val}px`);
-        API.updateConfig({ bg_blur: parseInt(val) });
     });
+    sliderBlur.addEventListener('change', () => API.updateConfig({ bg_blur: Number(sliderBlur.value) }));
 
     // Brightness slider
     sliderBrightness.addEventListener('input', (e) => {
         const val = e.target.value;
         labelBright.innerText = `${val}%`;
         document.documentElement.style.setProperty('--glass-brightness', `${val / 100}`);
-        API.updateConfig({ bg_brightness: parseInt(val) });
     });
+    sliderBrightness.addEventListener('change', () => API.updateConfig({ bg_brightness: Number(sliderBrightness.value) }));
 
     // Glass Opacity slider
     sliderOpacity.addEventListener('input', (e) => {
         const val = e.target.value;
         labelOpacity.innerText = `${val}%`;
         document.documentElement.style.setProperty('--glass-opacity', `${val / 100}`);
-        API.updateConfig({ glass_opacity: parseInt(val) });
     });
+    sliderOpacity.addEventListener('change', () => API.updateConfig({ glass_opacity: Number(sliderOpacity.value) }));
 
     // Bot Token Eye Toggle
     const btnEye = document.getElementById('btn-toggle-token-eye');
