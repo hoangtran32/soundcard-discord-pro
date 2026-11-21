@@ -14,6 +14,12 @@ function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => chars[char]);
 }
 
+function setText(id, value) {
+    const element = document.getElementById(id);
+    const text = String(value);
+    if (element.textContent !== text) element.textContent = text;
+}
+
 // --- Toast Notifications ---
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
@@ -54,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('error', (event) => {
         const img = event.target;
-        const fallback = '/static/icons/default_cover.png';
+        const fallback = '/static/icons/default_cover.jpg';
         if (img instanceof HTMLImageElement && img.hasAttribute('data-cover') && img.getAttribute('src') !== fallback) {
             img.src = fallback;
         }
@@ -96,16 +102,13 @@ async function loadInitialData() {
             API.getState()
         ]);
 
-        AppState.config = config;
+        AppState.config = { ...config, loaded: true };
         AppState.playlist = playlist;
         AppState.rooms = rooms;
-        AppState.playerState = state;
-
         applyConfigToUI(config);
         renderPlaylist();
         renderRooms();
         updatePlayerUI(state);
-        loadBackgroundGallery();
     } catch (e) {
         console.error('Initial data load error:', e);
     }
@@ -126,9 +129,8 @@ function initNavigation() {
             const targetEl = document.getElementById(`tab-${targetTab}`);
             if (targetEl) targetEl.classList.add('active');
 
-            if (targetTab === 'now-playing' && visualizerInstance) {
-                setTimeout(() => visualizerInstance.resize(), 50);
-            }
+            if (targetTab === 'playlist') renderPlaylist();
+            if (targetTab === 'settings' && !AppState.config.shared) loadBackgroundGallery();
         });
     });
 }
@@ -162,6 +164,7 @@ function initPlayerControls() {
             }
 
             try {
+                btnPlayPause.disabled = true;
                 document.getElementById('icon-play-pause').className = 'fa-solid fa-spinner fa-spin';
                 const res = await API.play();
                 if (res.status === 'ok') {
@@ -173,6 +176,9 @@ function initPlayerControls() {
                 }
             } catch (e) {
                 showToast(`Lỗi phát nhạc: ${e.message}`, 'error');
+            } finally {
+                btnPlayPause.disabled = false;
+                updatePlayerUI(AppState.playerState);
             }
         }
     });
@@ -211,10 +217,37 @@ function initPlayerControls() {
     });
 
     // Volume
-    volSlider.addEventListener('input', async (e) => {
-        const val = parseFloat(e.target.value);
-        volText.innerText = `${Math.round(val)}%`;
-        await API.setVolume(val / 100);
+    let volumeTimer;
+    let pendingVolume;
+    let volumeInFlight = false;
+    async function sendVolume() {
+        if (volumeInFlight || pendingVolume === undefined) return;
+        volumeInFlight = true;
+        const volume = pendingVolume;
+        pendingVolume = undefined;
+        try {
+            await API.setVolume(volume);
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            volumeInFlight = false;
+            if (!volumeTimer) sendVolume();
+        }
+    }
+
+    volSlider.addEventListener('input', () => {
+        pendingVolume = Number(volSlider.value) / 100;
+        volText.textContent = `${Math.round(pendingVolume * 100)}%`;
+        clearTimeout(volumeTimer);
+        volumeTimer = setTimeout(() => {
+            volumeTimer = undefined;
+            sendVolume();
+        }, 140);
+    });
+    volSlider.addEventListener('change', () => {
+        clearTimeout(volumeTimer);
+        volumeTimer = undefined;
+        sendVolume();
     });
 
     // Progress Seek Bar
@@ -232,92 +265,72 @@ function initPlayerControls() {
     document.getElementById('btn-refresh-rooms-live').addEventListener('click', async () => {
         AppState.rooms = await API.getRooms();
         renderRooms();
-        updateActiveChannelsLiveList();
     });
 }
 
 function updatePlayerUI(state) {
+    const previous = AppState.playerState;
     AppState.playerState = state;
 
-    const iconPlayPause = document.getElementById('icon-play-pause');
-    const discVinyl = document.getElementById('disc-vinyl');
-    const titleEl = document.getElementById('now-playing-title');
-    const artistEl = document.getElementById('now-playing-artist');
-    const coverImg = document.getElementById('now-playing-cover');
-    const timeCurrent = document.getElementById('time-current');
-    const timeTotal = document.getElementById('time-total');
-    const progressFill = document.getElementById('progress-fill');
-    const progressThumb = document.getElementById('progress-thumb');
-    const headerVuFill = document.getElementById('header-vu-fill');
-
     const isPlaying = state.is_playing && !state.is_paused;
-
-    // Play/Pause icon & vinyl spin
-    if (isPlaying) {
-        iconPlayPause.className = 'fa-solid fa-pause';
-        discVinyl.classList.add('spinning');
-    } else {
-        iconPlayPause.className = 'fa-solid fa-play';
-        discVinyl.classList.remove('spinning');
+    const wasPlaying = previous.is_playing && !previous.is_paused;
+    const icon = document.getElementById('icon-play-pause');
+    const iconClass = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+    if (!document.getElementById('btn-play-pause').disabled && icon.className !== iconClass) {
+        icon.className = iconClass;
+    }
+    if (isPlaying !== wasPlaying) {
+        document.getElementById('disc-vinyl').classList.toggle('spinning', Boolean(isPlaying));
     }
 
-    // Track Metadata
-    if (state.current_track) {
-        titleEl.innerText = state.current_track.title || 'Unknown Title';
-        artistEl.innerText = state.current_track.uploader || 'Unknown Artist';
-        if (state.current_track.thumbnail) {
-            coverImg.src = state.current_track.thumbnail;
-        }
-
-        const duration = state.current_track.duration || 0;
-        const pos = state.position || 0;
-
-        timeCurrent.innerText = formatTime(pos);
-        timeTotal.innerText = formatTime(duration);
-
-        const ratio = duration > 0 ? Math.min(100, (pos / duration) * 100) : 0;
-        progressFill.style.width = `${ratio}%`;
-        progressThumb.style.left = `${ratio}%`;
-    } else {
-        titleEl.innerText = 'Chưa phát bài hát nào';
-        artistEl.innerText = 'Chọn bài từ danh sách hoặc dán link';
-        timeCurrent.innerText = '00:00';
-        timeTotal.innerText = '00:00';
-        progressFill.style.width = '0%';
-        progressThumb.style.left = '0%';
+    const track = state.current_track;
+    const previousTrack = previous.current_track;
+    const trackChanged = track?.id !== previousTrack?.id;
+    if (trackChanged || track?.title !== previousTrack?.title || track?.uploader !== previousTrack?.uploader) {
+        setText('now-playing-title', track ? track.title || 'Unknown Title' : 'Chưa phát bài hát nào');
+        setText('now-playing-artist', track ? track.uploader || 'Unknown Artist' : 'Chọn bài từ danh sách hoặc dán link');
     }
-
-    // Visualizer data
+    if (trackChanged || track?.thumbnail !== previousTrack?.thumbnail) {
+        document.getElementById('now-playing-cover').src = track?.thumbnail || '/static/icons/default_cover.jpg';
+    }
+    if (trackChanged || state.position !== previous.position || track?.duration !== previousTrack?.duration) {
+        const duration = track?.duration || 0;
+        const position = track ? state.position || 0 : 0;
+        const ratio = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+        setText('time-current', formatTime(position));
+        setText('time-total', formatTime(duration));
+        document.getElementById('progress-fill').style.width = `${ratio}%`;
+        document.getElementById('progress-thumb').style.left = `${ratio}%`;
+    }
     if (visualizerInstance && state.spectrum) {
-        visualizerInstance.updateData(state.spectrum, state.vu_meter);
+        visualizerInstance.updateData(state.spectrum, state.vu_meter, Boolean(isPlaying));
+    }
+    if (state.vu_meter !== previous.vu_meter) {
+        const vuPercent = Math.min(100, (state.vu_meter || 0) * 100);
+        document.getElementById('header-vu-fill').style.width = `${vuPercent}%`;
+    }
+    if (state.repeat_mode !== previous.repeat_mode) updateRepeatUI(state.repeat_mode);
+    if (state.shuffle !== previous.shuffle) {
+        document.getElementById('btn-shuffle').classList.toggle('active', Boolean(state.shuffle));
     }
 
-    // Top VU Meter
-    const vuPercent = Math.min(100, (state.vu_meter || 0) * 100);
-    if (headerVuFill) {
-        headerVuFill.style.width = `${vuPercent}%`;
+    if (state.total_tracks_count !== previous.total_tracks_count) {
+        setText('playlist-count-badge', state.total_tracks_count || 0);
+        setText('pl-total-count', state.total_tracks_count || 0);
     }
-
-    // Repeat & Shuffle UI
-    updateRepeatUI(state.repeat_mode);
-    const btnShuffle = document.getElementById('btn-shuffle');
-    if (btnShuffle) {
-        btnShuffle.classList.toggle('active', !!state.shuffle);
+    if (state.selected_tracks_count !== previous.selected_tracks_count) {
+        setText('pl-selected-count', state.selected_tracks_count || 0);
     }
-
-    // Badges & Counters
-    document.getElementById('playlist-count-badge').innerText = state.total_tracks_count || 0;
-    document.getElementById('pl-selected-count').innerText = state.selected_tracks_count || 0;
-    document.getElementById('pl-total-count').innerText = state.total_tracks_count || 0;
-    document.getElementById('sb-selected-rooms').innerText = state.selected_rooms_count || 0;
-    document.getElementById('sb-active-rooms').innerText = state.connected_rooms_count || 0;
-    document.getElementById('rooms-count-badge').innerText = state.connected_rooms_count || 0;
-    document.getElementById('room-selected-stat').innerText = state.selected_rooms_count || 0;
-
-    // Highlight currently playing item in playlist list
-    highlightActivePlaylistItem(state.current_track ? state.current_track.id : null);
-    updateActiveChannelsLiveList();
-    updateQueuePreviewList();
+    if (state.selected_rooms_count !== previous.selected_rooms_count) {
+        setText('sb-selected-rooms', state.selected_rooms_count || 0);
+        setText('room-selected-stat', state.selected_rooms_count || 0);
+    }
+    if (state.connected_rooms_count !== previous.connected_rooms_count) {
+        setText('sb-active-rooms', state.connected_rooms_count || 0);
+        setText('rooms-count-badge', state.connected_rooms_count || 0);
+    }
+    if (trackChanged) highlightActivePlaylistItem(track?.id);
+    if (JSON.stringify(state.album_queue) !== JSON.stringify(previous.album_queue)) updateQueuePreviewList();
 }
 
 function updateRepeatUI(mode) {
@@ -386,7 +399,9 @@ async function refreshPlaylist() {
     renderPlaylist();
 }
 
-function renderPlaylist(searchQuery = '') {
+function renderPlaylist(searchQuery = document.getElementById('playlist-search-input').value.toLowerCase().trim()) {
+    updateSelectedCounts();
+    if (!document.getElementById('tab-playlist').classList.contains('active')) return;
     const container = document.getElementById('playlist-items-list');
     container.innerHTML = '';
 
@@ -407,7 +422,8 @@ function renderPlaylist(searchQuery = '') {
         return;
     }
 
-    filtered.forEach((track, index) => {
+    const rows = document.createDocumentFragment();
+    filtered.forEach(track => {
         const row = document.createElement('div');
         row.className = 'playlist-item-row';
         row.setAttribute('data-id', track.id);
@@ -415,13 +431,13 @@ function renderPlaylist(searchQuery = '') {
         const isCurrentPlaying = AppState.playerState.current_track && AppState.playerState.current_track.id === track.id;
         if (isCurrentPlaying) row.classList.add('is-active');
 
-        const thumb = track.thumbnail || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=200&auto=format&fit=crop&q=60';
+        const thumb = track.thumbnail || '/static/icons/default_cover.jpg';
 
         row.innerHTML = `
             <div class="item-left">
                 <input type="checkbox" class="custom-checkbox track-chk" ${track.selected ? 'checked' : ''} data-id="${escapeHtml(track.id)}">
                 <div class="item-thumb">
-                    <img src="${escapeHtml(thumb)}" alt="" data-cover>
+                    <img src="${escapeHtml(thumb)}" alt="" loading="lazy" decoding="async" data-cover>
                 </div>
                 <div class="item-info">
                     <div class="item-title" title="${escapeHtml(track.title)}">${escapeHtml(track.title)}</div>
@@ -465,10 +481,9 @@ function renderPlaylist(searchQuery = '') {
             showToast('Đã xóa bài hát khỏi danh sách', 'info');
         });
 
-        container.appendChild(row);
+        rows.appendChild(row);
     });
-
-    updateSelectedCounts();
+    container.appendChild(rows);
 }
 
 function highlightActivePlaylistItem(currentTrackId) {
@@ -484,8 +499,9 @@ function highlightActivePlaylistItem(currentTrackId) {
 
 function updateSelectedCounts() {
     const selectedCount = AppState.playlist.filter(p => p.selected).length;
-    document.getElementById('pl-selected-count').innerText = selectedCount;
-    document.getElementById('pl-total-count').innerText = AppState.playlist.length;
+    setText('pl-selected-count', selectedCount);
+    setText('pl-total-count', AppState.playlist.length);
+    updateQueuePreviewList();
 }
 
 // --- Voice Rooms Management ---
@@ -574,11 +590,25 @@ function initRoomActions() {
 }
 
 function updateRoomsState(updatedRooms) {
+    const previous = AppState.rooms;
     AppState.rooms = updatedRooms;
+    const identityFields = ['id', 'name', 'guild_id', 'channel_id', 'bot_token'];
+    if (previous.length !== updatedRooms.length || updatedRooms.some((room, i) =>
+        identityFields.some(field => room[field] !== previous[i][field]))) {
+        renderRooms();
+        return;
+    }
+    let statusChanged = false;
     // Update live badges, cards and action buttons
-    updatedRooms.forEach(r => {
+    updatedRooms.forEach((r, i) => {
+        const before = previous[i];
+        const changed = r.status !== before.status || r.ping !== before.ping;
+        if (!changed && r.selected === before.selected) return;
         const card = document.querySelector(`.room-card[data-id="${r.id}"]`);
         if (card) {
+            card.querySelector('.room-chk').checked = Boolean(r.selected);
+            if (!changed) return;
+            statusChanged = true;
             card.className = `room-card status-${r.status || 'disconnected'}`;
             const badge = card.querySelector('.room-status-badge');
             if (badge) {
@@ -613,7 +643,7 @@ function updateRoomsState(updatedRooms) {
             }
         }
     });
-    updateActiveChannelsLiveList();
+    if (statusChanged) updateActiveChannelsLiveList();
 }
 
 function getStatusBadgeHTML(status, ping) {
@@ -630,6 +660,7 @@ function getStatusBadgeHTML(status, ping) {
 }
 
 function renderRooms() {
+    updateActiveChannelsLiveList();
     const grid = document.getElementById('rooms-grid');
     grid.innerHTML = '';
 
@@ -876,7 +907,7 @@ async function loadBackgroundGallery() {
         data.files.forEach(filename => {
             const card = document.createElement('div');
             card.className = `bg-item-card ${data.current === filename ? 'active' : ''}`;
-            card.innerHTML = `<img src="/background/${filename}" alt="${filename}">`;
+            card.innerHTML = `<img src="/background/${encodeURIComponent(filename)}" alt="${escapeHtml(filename)}" loading="lazy" decoding="async">`;
 
             card.addEventListener('click', async () => {
                 document.querySelectorAll('.bg-item-card').forEach(c => c.classList.remove('active'));

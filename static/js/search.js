@@ -83,7 +83,7 @@ function initMultiPlatformSearch() {
             ? ` · ${viewFormat.format(item.view_count)} lượt xem` : '';
         const duration = item.duration > 0 ? item.duration_str : '';
         const title = item.title || 'Video chưa có tên';
-        const thumbnail = item.thumbnail || '/static/icons/default_cover.png';
+        const thumbnail = item.thumbnail || '/static/icons/default_cover.jpg';
         const enhanced = Boolean(AppState.config.search_actions_enabled);
 
         card.innerHTML = `

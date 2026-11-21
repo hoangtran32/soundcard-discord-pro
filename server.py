@@ -9,11 +9,12 @@ if sys.platform == "win32":
         pass
 
 import asyncio
+import json
 import math
 import os
 import glob
 from typing import Dict, Any, List, Optional
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from uuid import uuid4
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Body, Depends
@@ -44,6 +45,8 @@ async def lifespan(app: FastAPI):
     print("[Server] SoundCard Discord backend started successfully!")
     yield
     broadcast_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await broadcast_task
     streamer.stop()
     await streamer.disconnect_all_rooms()
     for bot in streamer.bots.values():
@@ -86,7 +89,7 @@ async def get_index():
         return FileResponse(index_path)
     return HTMLResponse("<h1>SoundCard Discord Server Running</h1>")
 
-active_websockets: List[WebSocket] = []
+active_websockets: dict[WebSocket, str | None] = {}
 room_connections = asyncio.Lock()
 
 
@@ -135,45 +138,49 @@ async def websocket_player(websocket: WebSocket):
         await websocket.close(code=1008)
         return
     await websocket.accept()
-    active_websockets.append(websocket)
     try:
-        streamer.sync_rooms_status()
         await websocket.send_json({
             "type": "state_update",
             "state": streamer.get_state(),
             "rooms": browser_rooms(),
             "config": browser_config()
         })
+        active_websockets[websocket] = None
         while True:
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError, OSError):
+        pass
+    finally:
+        active_websockets.pop(websocket, None)
+
+
+async def _send_player_tick(websocket: WebSocket, payload: str):
+    try:
+        await asyncio.wait_for(websocket.send_text(payload), timeout=0.5)
+    except (TimeoutError, WebSocketDisconnect, RuntimeError, OSError):
+        active_websockets.pop(websocket, None)
+        with suppress(TimeoutError, WebSocketDisconnect, RuntimeError, OSError):
+            await asyncio.wait_for(websocket.close(code=1011), timeout=0.25)
+    else:
         if websocket in active_websockets:
-            active_websockets.remove(websocket)
-    except Exception:
-        if websocket in active_websockets:
-            active_websockets.remove(websocket)
+            active_websockets[websocket] = payload
 
 async def _ws_broadcast_loop():
     """Real-time broadcast loop for VU meter, position, and synced room connection status."""
     while True:
         try:
             if active_websockets:
-                streamer.sync_rooms_status()
-                payload = {
+                payload = json.dumps({
                     "type": "tick",
                     "state": streamer.get_state(),
                     "rooms": browser_rooms()
-                }
-                dead = []
-                for ws in active_websockets:
-                    try:
-                        await ws.send_json(payload)
-                    except Exception:
-                        dead.append(ws)
-                for d in dead:
-                    if d in active_websockets:
-                        active_websockets.remove(d)
-            await asyncio.sleep(0.08)
+                }, ensure_ascii=False, separators=(",", ":"))
+                await asyncio.gather(*(
+                    _send_player_tick(ws, payload)
+                    for ws, last_payload in active_websockets.items()
+                    if payload != last_payload
+                ))
+            await asyncio.sleep(0.15)
         except asyncio.CancelledError:
             break
         except Exception:
@@ -184,7 +191,6 @@ async def _ws_broadcast_loop():
 # State
 @app.get("/api/state")
 async def get_state():
-    streamer.sync_rooms_status()
     return streamer.get_state()
 
 # Search API (YouTube, SoundCloud, Spotify, Direct URLs)

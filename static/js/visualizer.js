@@ -11,32 +11,66 @@ class VisualizerRenderer {
         this.targetData = new Array(this.bars).fill(0);
         this.vu = 0;
         this.targetVu = 0;
+        this.playing = false;
+        this.visible = false;
+        this.frame = null;
+        this.lastPaint = 0;
         
-        this.resize();
         window.addEventListener('resize', () => this.resize());
-        this.animate();
+        document.addEventListener('visibilitychange', () => this.scheduleDraw());
+        const observer = new IntersectionObserver(([entry]) => {
+            this.visible = entry.isIntersecting;
+            if (this.visible) {
+                this.resize();
+                this.scheduleDraw();
+            }
+        });
+        observer.observe(this.canvas);
     }
 
     resize() {
         if (!this.canvas) return;
-        this.canvas.width = this.canvas.parentElement.clientWidth || 300;
+        const width = this.canvas.parentElement.clientWidth;
+        if (!width || (this.gradient && width === this.canvas.width)) return;
+        this.canvas.width = width;
         this.canvas.height = 60;
+        this.gradient = this.ctx.createLinearGradient(0, this.canvas.height, 0, 0);
+        this.gradient.addColorStop(0, '#00f2fe');
+        this.gradient.addColorStop(0.6, '#4facfe');
+        this.gradient.addColorStop(1, '#ff007f');
+        this.scheduleDraw();
     }
 
-    updateData(spectrum16, vu) {
-        this.targetVu = vu || 0;
-        if (Array.isArray(spectrum16)) {
-            // Expand 16 bands to 32 bars with interpolation
+    updateData(spectrum16, vu, playing) {
+        if (!playing && !this.playing) return;
+        this.playing = playing;
+        this.targetVu = playing ? vu || 0 : 0;
+        if (!playing) {
+            this.targetData.fill(0);
+            this.spectrumData.fill(0);
+            this.vu = 0;
+        } else {
             for (let i = 0; i < this.bars; i++) {
-                const srcIdx = Math.floor(i / 2);
-                this.targetData[i] = (spectrum16[srcIdx] || 0) * 0.8;
+                this.targetData[i] = (spectrum16[Math.floor(i / 2)] || 0) * 0.8;
             }
+        }
+        this.scheduleDraw();
+    }
+
+    scheduleDraw() {
+        if (this.frame === null && this.visible && !document.hidden) {
+            this.frame = requestAnimationFrame(timestamp => this.animate(timestamp));
         }
     }
 
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        if (!this.ctx) return;
+    animate(timestamp) {
+        this.frame = null;
+        if (!this.visible || document.hidden || !this.gradient) return;
+        if (this.playing) {
+            this.scheduleDraw();
+            if (timestamp - this.lastPaint < 31) return;
+        }
+        this.lastPaint = timestamp;
 
         const w = this.canvas.width;
         const h = this.canvas.height;
@@ -47,10 +81,7 @@ class VisualizerRenderer {
         this.vu += (this.targetVu - this.vu) * 0.25;
 
         const barWidth = (w / this.bars) - 3;
-        const gradient = this.ctx.createLinearGradient(0, h, 0, 0);
-        gradient.addColorStop(0, '#00f2fe');
-        gradient.addColorStop(0.6, '#4facfe');
-        gradient.addColorStop(1, '#ff007f');
+        this.ctx.fillStyle = this.gradient;
 
         for (let i = 0; i < this.bars; i++) {
             // Smoothly ease towards target with decay
@@ -64,7 +95,6 @@ class VisualizerRenderer {
             const y = h - barHeight;
 
             // Draw rounded bar
-            this.ctx.fillStyle = gradient;
             this.ctx.shadowColor = 'rgba(0, 242, 254, 0.5)';
             this.ctx.shadowBlur = barHeight > 10 ? 8 : 0;
 

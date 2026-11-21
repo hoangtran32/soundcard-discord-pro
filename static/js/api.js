@@ -74,11 +74,13 @@ class SoundCardWebSocket {
     constructor() {
         this.ws = null;
         this.listeners = [];
+        this.pendingUpdate = null;
         this.reconnectTimer = null;
         this.init();
     }
 
     init() {
+        this.pendingUpdate = null;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/player`;
 
@@ -99,6 +101,10 @@ class SoundCardWebSocket {
         this.ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                if (!this.listeners.length) {
+                    this.pendingUpdate = { ...this.pendingUpdate, ...data };
+                    return;
+                }
                 this.listeners.forEach(fn => fn(data));
             } catch (e) {
                 console.error('[WS Parse Error]', e);
@@ -120,6 +126,11 @@ class SoundCardWebSocket {
 
     onUpdate(callback) {
         this.listeners.push(callback);
+        if (this.pendingUpdate) {
+            const update = this.pendingUpdate;
+            this.pendingUpdate = null;
+            callback(update);
+        }
     }
 }
 
