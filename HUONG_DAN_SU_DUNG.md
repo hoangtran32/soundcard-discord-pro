@@ -22,6 +22,8 @@
 - Link gửi bạn bè: [SoundCard Discord](https://hoangtran32.github.io/soundcard-discord-pro/).
 - Trên máy Windows đã cấu hình Discord, chạy `Chay_SoundCard_Web.bat` và giữ cửa sổ mở. File này chạy Python, mở tunnel HTTPS và cập nhật địa chỉ tunnel trên GitHub. Khi tắt hoặc mất kết nối, trang GitHub hiển thị trạng thái chưa kết nối.
 - Chọn **Mở trình phát**, rồi đăng nhập bằng `music` và mật khẩu trong `data/share-password.txt`.
+- Để bạn bè vào thẳng trình phát, gửi link đầy đủ trong `data/link-moi.txt` sau khi chạy `Chay_SoundCard_Web.bat`. Link này dùng lại được khi Cloudflare đổi địa chỉ. Hồ sơ album cá nhân vẫn dùng thông tin đăng nhập riêng.
+- Muốn đổi link mời, dừng file `.bat`, xóa `data/guest-link-key.txt` rồi chạy lại. Link mời cũ sẽ hết hiệu lực.
 - Mỗi máy chạy cần quyền ghi repo qua Git Credential Manager và tệp cục bộ `data/pages-repo.txt` chứa `hoangtran32/soundcard-discord-pro`. Nhánh `soundcard-live` chỉ cập nhật địa chỉ tunnel công khai. Trang GitHub Pages phục vụ từ `main/docs`.
 
 ### Chia sẻ bằng link tunnel trực tiếp

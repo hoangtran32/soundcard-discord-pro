@@ -17,7 +17,7 @@ from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager, suppress
 from uuid import uuid4
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Body, Depends
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Body, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,7 +32,7 @@ from core.room_manager import room_manager
 from core.discord_streamer import streamer
 from core.search_engine import search_engine
 from core.web_share import (
-    SHARED, authenticated, protect_shared_web, require_local_admin, same_origin,
+    GUEST_KEY, SHARED, authenticated, protect_shared_web, redeem_guest_link, require_local_admin, same_origin,
     playable_search_track, shared_search_query, shared_search_results,
 )
 
@@ -88,6 +88,15 @@ async def get_index():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return HTMLResponse("<h1>SoundCard Discord Server Running</h1>")
+
+if GUEST_KEY:
+    @app.get("/join")
+    async def join_page():
+        return FileResponse(os.path.join(STATIC_DIR, "join.html"))
+
+    @app.post("/api/join", status_code=204)
+    async def join_with_invite(request: Request):
+        return redeem_guest_link(request)
 
 active_websockets: dict[WebSocket, str | None] = {}
 room_connections = asyncio.Lock()
